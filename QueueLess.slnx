@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="QueueLess.Application/QueueLess.Application.csproj" />
+  <Project Path="QueueLess.Domain/QueueLess.Domain.csproj" />
+  <Project Path="QueueLess.Infrastructure/QueueLess.Infrastructure.csproj" />
+  <Project Path="QueueLess.IntegrationTests/QueueLess.IntegrationTests.csproj" />
+  <Project Path="QueueLess.WebApi/QueueLess.WebApi.csproj" />
+</Solution>
