@@ -1,9 +1,17 @@
+using Microsoft.EntityFrameworkCore;
+using QueueLess.Infrastructure.Persistence;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// 1. Retrieve the connection string from the configuration manager
+// (reads appsettings.json, then overrides it with User Secrets locally, or Environment Variables in production)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
 
+//2 Register the DbContext as Scoped (default) using PostgreSQL
+builder.Services.AddDbContext<QlDbContext>(options => options.UseNpgsql(connectionString, b => b.MigrationsAssembly("QueueLess.Infrastructure"))); //Generates migration inside Infrastructure
+
+// Add services to the container.
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

@@ -23,5 +23,7 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
             .WithMany(f => f.Services)
             .HasForeignKey(s => s.FacilityId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(s => !s.IsDeleted);
     }
 }
