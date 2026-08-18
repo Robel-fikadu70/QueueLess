@@ -31,7 +31,8 @@ public static class DependencyInjection
         //Concrete mappings
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IIdentityService, IdentityService>();
-
+        services.AddHttpContextAccessor(); // Required to read HttpContext properties outside WebApi
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
         return services;
     }
 }
