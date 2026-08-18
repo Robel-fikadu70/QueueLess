@@ -1,12 +1,16 @@
 using System.Text;
+using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using QueueLess.Application.Common.Behaviors;
 using QueueLess.Application.Interfaces;
 using QueueLess.Infrastructure.Identity;
 using QueueLess.Infrastructure.Persistence;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +30,14 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 })
 .AddEntityFrameworkStores<QlDbContext>()
 .AddDefaultTokenProviders();
+
+// Configure Antiforgery to look for the Angular default header
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+});
+
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(IJwtTokenGenerator).Assembly));
 
 // 4. Jwt Authentication configuration
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
@@ -63,14 +75,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddValidatorsFromAssembly(typeof(IJwtTokenGenerator).Assembly);
+
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
 // 5. Interface Registration (DI)
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.AddScoped<IIdentityService, IdentityService>();
 
-// Configure Antiforgery to look for the Angular default header
-builder.Services.AddAntiforgery(options =>
-{
-    options.HeaderName = "X-XSRF-TOKEN";
-});
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -78,10 +90,12 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
@@ -99,12 +113,12 @@ app.Use((context, next) =>
     // SameSite=Lax and Secure=true ensures security over the network.
     context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
     {
-        HttpOnly = false, 
+        HttpOnly = false, // Must be readable by Angular to place in request header
         Secure = true, 
-        SameSite = SameSiteMode.Lax
+        SameSite = SameSiteMode.Lax // Allows safe navigation references
     });
 
-    return next();
+    return next(context);
 });
 app.MapControllers();
 
