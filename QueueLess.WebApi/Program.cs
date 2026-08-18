@@ -80,6 +80,7 @@ builder.Services.AddValidatorsFromAssembly(typeof(IJwtTokenGenerator).Assembly);
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
 // 5. Interface Registration (DI)
+builder.Services.AddScoped<IQlDbContext>(provider => provider.GetRequiredService<QlDbContext>());
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 
