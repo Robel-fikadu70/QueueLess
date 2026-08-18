@@ -1,0 +1,22 @@
+using System.Reflection;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using QueueLess.Domain.Entities;
+using QueueLess.Infrastructure.Identity;
+
+namespace QueueLess.Infrastructure.Persistence;
+
+public class QlDbContext(DbContextOptions<QlDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+{
+    public DbSet<Facility> Facilities => Set<Facility>();
+    public DbSet<Service> Services => Set<Service>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+    public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
+
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+
+        builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+    }
+}
