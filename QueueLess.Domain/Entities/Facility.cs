@@ -11,8 +11,6 @@ public class Facility : BaseEntity
     public required string Location { get; set; }
     public required string OperatingHours { get; set; } // e.g., "08:00 - 17:00"
     public QueueStatus Status { get; set; } = QueueStatus.Closed;
-    public bool IsDeleted { get; set; } = false;
-
     // Navigation Property
     public ICollection<Service> Services { get; set; } = new List<Service>();
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using QueueLess.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using QueueLess.Infrastructure.Persistence;
 namespace QueueLess.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(QlDbContext))]
-    partial class QlDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260818114712_AddGlobalSoftDelete")]
+    partial class AddGlobalSoftDelete
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -6,30 +6,19 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using QueueLess.Application;
 using QueueLess.Application.Common.Behaviors;
 using QueueLess.Application.Interfaces;
+using QueueLess.Infrastructure;
 using QueueLess.Infrastructure.Identity;
 using QueueLess.Infrastructure.Persistence;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Retrieve the connection string from the configuration manager
-// (reads appsettings.json, then overrides it with User Secrets locally, or Environment Variables in production)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
-
-//2 Register the DbContext as Scoped (default) using PostgreSQL
-builder.Services.AddDbContext<QlDbContext>(options => options.UseNpgsql(connectionString, b => b.MigrationsAssembly("QueueLess.Infrastructure"))); //Generates migration inside Infrastructure
-
-//3. Identity Service Setup
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
-{
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequiredLength = 6;
-})
-.AddEntityFrameworkStores<QlDbContext>()
-.AddDefaultTokenProviders();
+// module services registration
+builder.Services.AddApplicationServices();
+builder.Services.AddInfrastructureService(builder.Configuration);
 
 // Configure Antiforgery to look for the Angular default header
 builder.Services.AddAntiforgery(options =>
@@ -37,9 +26,7 @@ builder.Services.AddAntiforgery(options =>
     options.HeaderName = "X-XSRF-TOKEN";
 });
 
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(IJwtTokenGenerator).Assembly));
-
-// 4. Jwt Authentication configuration
+// Jwt Authentication configuration
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
     ?? throw new InvalidOperationException("JWT Secret is not configured.");
 
@@ -75,16 +62,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddValidatorsFromAssembly(typeof(IJwtTokenGenerator).Assembly);
-
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-
-// 5. Interface Registration (DI)
-builder.Services.AddScoped<IQlDbContext>(provider => provider.GetRequiredService<QlDbContext>());
-builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-builder.Services.AddScoped<IIdentityService, IdentityService>();
-
-
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
@@ -98,8 +75,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
-app.UseHttpsRedirection();
+else
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication(); //Determines WHO is requesting
 app.UseAuthorization(); //Determines WHAT they can access
@@ -115,7 +94,7 @@ app.Use((context, next) =>
     context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
     {
         HttpOnly = false, // Must be readable by Angular to place in request header
-        Secure = true, 
+        Secure = !app.Environment.IsDevelopment(), 
         SameSite = SameSiteMode.Lax // Allows safe navigation references
     });
 

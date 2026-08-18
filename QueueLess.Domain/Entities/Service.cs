@@ -11,8 +11,6 @@ public class Service : BaseEntity
     public string? Description { get; set; }
     public int EstimatedDurationMinutes { get; set; }
     public bool IsActive { get; set; } = true;
-    public bool IsDeleted { get; set; } = false;
-
 
     // Navigation Properties
     public Facility? Facility { get; set; }
