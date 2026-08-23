@@ -10,10 +10,11 @@ namespace QueueLess.Application.Features.Staff.Commands;
 
 public record StartServiceCommand(Guid TicketId) : IRequest<Unit>;
 
-public class StartServiceCommandHandler(IQlDbContext context, ICurrentUserService currentUserService) : IRequestHandler<StartServiceCommand, Unit>
+public class StartServiceCommandHandler(IQlDbContext context, ICurrentUserService currentUserService, IQueueNotificationService notificationService) : IRequestHandler<StartServiceCommand, Unit>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly IQueueNotificationService _notificationService = notificationService;
 
     public async Task<Unit> Handle(StartServiceCommand request, CancellationToken cancellationToken)
     {
@@ -39,6 +40,12 @@ public class StartServiceCommandHandler(IQlDbContext context, ICurrentUserServic
         ticket.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+        // Real-Time Push: Notify the customer that counter service has started
+        await _notificationService.NotifyTicketStatusChangedAsync(
+            ticket.CustomerId, 
+            ticket.Id, 
+            ticket.TicketNumber, 
+            ticket.State.ToString().ToUpper());
 
         return Unit.Value;
     }

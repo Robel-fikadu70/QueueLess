@@ -10,10 +10,11 @@ namespace QueueLess.Application.Features.Staff.Commands;
 
 public record CompleteServiceCommand(Guid TicketId) : IRequest<Unit>;
 
-public class CompleteServiceCommandHandler(IQlDbContext context, ICurrentUserService currentUserService) : IRequestHandler<CompleteServiceCommand, Unit>
+public class CompleteServiceCommandHandler(IQlDbContext context, ICurrentUserService currentUserService, IQueueNotificationService notificationService) : IRequestHandler<CompleteServiceCommand, Unit>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly IQueueNotificationService _notificationService = notificationService;
 
     public async Task<Unit> Handle(CompleteServiceCommand request, CancellationToken cancellationToken)
     {
@@ -39,6 +40,16 @@ public class CompleteServiceCommandHandler(IQlDbContext context, ICurrentUserSer
         ticket.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Real-Time Push: Notify the customer that service is completed
+        await _notificationService.NotifyTicketStatusChangedAsync(
+            ticket.CustomerId, 
+            ticket.Id, 
+            ticket.TicketNumber, 
+            ticket.State.ToString().ToUpper());
+
+        // Real-Time Push: Notify all other waiting users to shift positions
+        await _notificationService.NotifyQueuePositionChangedAsync(ticket.ServiceId);
 
         return Unit.Value;
     }

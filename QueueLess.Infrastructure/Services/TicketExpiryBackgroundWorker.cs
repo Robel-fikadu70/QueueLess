@@ -39,6 +39,8 @@ public class TicketExpiryBackgroundWorker(
                 // Process the expiration check securely within a dynamically allocated scope
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<IQlDbContext>();
+                var notificationService = scope.ServiceProvider.GetRequiredService<IQueueNotificationService>();
+
 
                 var ticket = await dbContext.Tickets.FindAsync([task.TicketId], stoppingToken);
 
@@ -52,6 +54,17 @@ public class TicketExpiryBackgroundWorker(
 
                         await dbContext.SaveChangesAsync(stoppingToken);
                         _logger.LogWarning("Ticket {TicketNumber} transitioned to No-Show due to grace period expiration.", ticket.TicketNumber);
+
+                        //Real-Time Push: Notify the customer immediately that they have been skipped
+                        await notificationService.NotifyTicketStatusChangedAsync(
+                            ticket.CustomerId,
+                            ticket.Id,
+                            ticket.TicketNumber,
+                            ticket.State.ToString().ToUpper()
+                        );
+
+                        //Real-Time push: Notify remaining queue candidates to shift positions
+                        await notificationService.NotifyQueuePositionChangedAsync(ticket.ServiceId);
                     }
                 }
             }

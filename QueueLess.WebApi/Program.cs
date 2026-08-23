@@ -65,6 +65,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -101,6 +102,8 @@ app.Use((context, next) =>
     return next(context);
 });
 app.MapControllers();
+
+app.MapHub<QueueLess.Infrastructure.Notifications.QueueHub>("/hubs/queue");
 
 // Execute Seeding on Startup
 using (var scope = app.Services.CreateScope())

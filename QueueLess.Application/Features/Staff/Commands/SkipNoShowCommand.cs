@@ -10,10 +10,11 @@ namespace QueueLess.Application.Features.Staff.Commands;
 
 public record SkipNoShowCommand(Guid TicketId) : IRequest<Unit>;
 
-public class SkipNoShowCommandHandler(IQlDbContext context, ICurrentUserService currentUserService) : IRequestHandler<SkipNoShowCommand, Unit>
+public class SkipNoShowCommandHandler(IQlDbContext context, ICurrentUserService currentUserService, IQueueNotificationService notificationService) : IRequestHandler<SkipNoShowCommand, Unit>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly IQueueNotificationService _notificationService = notificationService;
 
     public async Task<Unit> Handle(SkipNoShowCommand request, CancellationToken cancellationToken)
     {
@@ -38,6 +39,16 @@ public class SkipNoShowCommandHandler(IQlDbContext context, ICurrentUserService 
         ticket.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Real-Time Push: Notify the skipped customer
+        await _notificationService.NotifyTicketStatusChangedAsync(
+            ticket.CustomerId, 
+            ticket.Id, 
+            ticket.TicketNumber, 
+            ticket.State.ToString().ToUpper());
+
+        // Real-Time Push: Notify all other waiting users to shift positions
+        await _notificationService.NotifyQueuePositionChangedAsync(ticket.ServiceId);
 
         return Unit.Value;
     }
