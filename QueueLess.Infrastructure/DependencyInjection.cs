@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using QueueLess.Application.Interfaces;
 using QueueLess.Infrastructure.Identity;
 using QueueLess.Infrastructure.Persistence;
+using QueueLess.Infrastructure.Services;
 
 namespace QueueLess.Infrastructure;
 
@@ -33,6 +34,11 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddHttpContextAccessor(); // Required to read HttpContext properties outside WebApi
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        
+        //thread-safe queue as a Singleton (Shared across all writing requests and reading threads)
+        services.AddSingleton<ITicketExpiryQueue, TicketExpiryQueue>();
+
+        services.AddHostedService<TicketExpiryBackgroundWorker>();
         return services;
     }
 }

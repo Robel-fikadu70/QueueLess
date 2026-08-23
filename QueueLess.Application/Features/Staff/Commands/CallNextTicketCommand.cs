@@ -11,10 +11,11 @@ namespace QueueLess.Application.Features.Staff.Commands;
 
 public record CallNextTicketCommand(Guid ServiceId) : IRequest<Guid?>;
 
-public class CallNextTicketCommandHandler(IQlDbContext context, ICurrentUserService currentUserService) : IRequestHandler<CallNextTicketCommand, Guid?>
+public class CallNextTicketCommandHandler(IQlDbContext context, ICurrentUserService currentUserService, ITicketExpiryQueue expiryQueue) : IRequestHandler<CallNextTicketCommand, Guid?>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly ITicketExpiryQueue _expiryQueue = expiryQueue;
 
     public async Task<Guid?> Handle(CallNextTicketCommand request, CancellationToken cancellationToken)
     {
@@ -42,6 +43,14 @@ public class CallNextTicketCommandHandler(IQlDbContext context, ICurrentUserServ
         nextTicket.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        //Dynamic Expiry Queue Task Creation: Configured with a default 5 minute grace period
+        var gracePeriodMinuets = 5;
+        var expirationTimestamp = DateTime.UtcNow.AddMinutes(gracePeriodMinuets);
+
+        await _expiryQueue.QueueExpiryCheckAsync(
+            new Common.Models.TicketExpiryTask(nextTicket.Id, expirationTimestamp), cancellationToken
+        );
 
         return nextTicket.Id;
     }
