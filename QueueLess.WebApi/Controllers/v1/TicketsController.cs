@@ -19,7 +19,7 @@ public class TicketController(ISender sender) : ControllerBase
     public async Task<IActionResult> Join([FromBody] JoinQueueCommand command)
     {
         var ticketId = await _sender.Send(command);
-        return CreatedAtAction(nameof(GetDashboard), new {id = ticketId}, ticketId);
+        return CreatedAtAction(nameof(GetDashboard), new { id = ticketId }, ticketId);
     }
 
     [HttpPost("{id:guid}/checkin")]
@@ -34,5 +34,18 @@ public class TicketController(ISender sender) : ControllerBase
     {
         var result = await _sender.Send(new GetTicketDashboardQuery(id));
         return Ok(result);
+    }
+    [HttpGet("history")]
+    public async Task<ActionResult<System.Collections.Generic.IEnumerable<QueueLess.Domain.Entities.Ticket>>> GetHistory()
+    {
+        var result = await _sender.Send(new GetTicketHistoryQuery());
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id)
+    {
+        await _sender.Send(new CancelTicketCommand(id));
+        return NoContent();
     }
 }
