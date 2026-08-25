@@ -16,6 +16,8 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
 
         builder.Property(s => s.Description)
             .HasMaxLength(500);
+        
+        builder.HasQueryFilter(s => !s.IsDeleted && !s.Facility!.IsDeleted);
 
         //One-to-Many: Facility has many Service.
         //Prevent deleting a facility if it has active service configured
@@ -23,7 +25,5 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
             .WithMany(f => f.Services)
             .HasForeignKey(s => s.FacilityId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(s => !s.IsDeleted);
     }
 }

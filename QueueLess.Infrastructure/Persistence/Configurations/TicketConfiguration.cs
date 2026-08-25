@@ -23,6 +23,7 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         // Ensure the sequence number index remains unique per service per day
         builder.HasIndex(t => new { t.ServiceId, t.SequenceNumber, t.CreatedAt }).IsUnique();
 
+        builder.HasQueryFilter(t => !t.IsDeleted && !t.Service!.IsDeleted);
         // Service has many Tickets. Prevent deleting a Service with active Tickets.
         builder.HasOne(t => t.Service)
             .WithMany(s => s.Tickets)
