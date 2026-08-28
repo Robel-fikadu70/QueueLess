@@ -12,6 +12,7 @@ using QueueLess.Application.Interfaces;
 using QueueLess.Infrastructure;
 using QueueLess.Infrastructure.Identity;
 using QueueLess.Infrastructure.Persistence;
+using QueueLess.WebApi.Middleware;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +20,8 @@ var builder = WebApplication.CreateBuilder(args);
 // module services registration
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureService(builder.Configuration);
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 // Configure Antiforgery to look for the Angular default header
 builder.Services.AddAntiforgery(options =>
@@ -69,6 +72,7 @@ builder.Services.AddSignalR();
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

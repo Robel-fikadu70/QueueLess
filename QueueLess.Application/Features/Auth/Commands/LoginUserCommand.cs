@@ -11,14 +11,9 @@ public record LoginUserCommand(
     string Password
 ) : IRequest<AuthResponseDto>;
 
-public class LoginUserCommandHandler : IRequestHandler<LoginUserCommand, AuthResponseDto>
+public class LoginUserCommandHandler(IIdentityService identityService) : IRequestHandler<LoginUserCommand, AuthResponseDto>
 {
-    private readonly IIdentityService _identityService;
-
-    public LoginUserCommandHandler(IIdentityService identityService)
-    {
-        _identityService = identityService;
-    }
+    private readonly IIdentityService _identityService = identityService;
 
     public async Task<AuthResponseDto> Handle(LoginUserCommand request, CancellationToken cancellationToken)
     {

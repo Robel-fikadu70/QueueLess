@@ -7,6 +7,7 @@ using QueueLess.Application.DTOs.Auth;
 using QueueLess.Application.DTOs.Staff;
 using QueueLess.Application.DTOs.Users;
 using QueueLess.Application.Interfaces;
+using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Infrastructure.Identity;
 
@@ -32,7 +33,7 @@ public class IdentityService(
         var existingUser = await _userManager.FindByEmailAsync(email);
         if (existingUser != null)
         {
-            throw new InvalidOperationException("Email address is already in use.");
+            throw new BusinessRuleException("Email address is already in use.");
         }
 
         var user = new ApplicationUser
@@ -47,7 +48,7 @@ public class IdentityService(
         if (!result.Succeeded)
         {
             var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-            throw new InvalidOperationException($"User registration failed: {errors}");
+            throw new BusinessRuleException($"User registration failed: {errors}");
         }
 
         //Assign standard role
@@ -72,13 +73,13 @@ public class IdentityService(
         var user = await _userManager.FindByEmailAsync(email);
         if (user == null)
         {
-            throw new InvalidOperationException("Invalid email or password.");
+            throw new BusinessRuleException("Invalid email or password.");
         }
 
         var result = await _signInManager.CheckPasswordSignInAsync(user, password, false);
         if (!result.Succeeded)
         {
-            throw new InvalidOperationException("Invalid email or password.");
+            throw new BusinessRuleException("Invalid email or password.");
         }
 
         var roles = await _userManager.GetRolesAsync(user);
