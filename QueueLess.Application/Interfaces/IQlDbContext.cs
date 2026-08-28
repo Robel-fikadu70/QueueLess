@@ -10,6 +10,7 @@ public interface IQlDbContext
     DbSet<Service> Services {get ;}
     DbSet<Ticket> Tickets {get ;}
     DbSet<StaffAssignment> StaffAssignments {get ;}
+    DbSet<RefreshToken> RefreshTokens {get ;}
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

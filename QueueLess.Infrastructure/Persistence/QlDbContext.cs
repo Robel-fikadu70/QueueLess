@@ -13,6 +13,7 @@ public class QlDbContext(DbContextOptions<QlDbContext> options) : IdentityDbCont
     public DbSet<Service> Services => Set<Service>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -7,6 +7,7 @@ using QueueLess.Application.DTOs.Auth;
 using QueueLess.Application.DTOs.Staff;
 using QueueLess.Application.DTOs.Users;
 using QueueLess.Application.Interfaces;
+using QueueLess.Domain.Entities;
 using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Infrastructure.Identity;
@@ -23,12 +24,7 @@ public class IdentityService(
     private readonly IJwtTokenGenerator _tokenGenerator = tokenGenerator;
     private readonly IQlDbContext _context = qlDbContext;
 
-    public async Task<AuthResponseDto> RegisterAsync(
-        string email,
-        string password,
-        string firstName,
-        string lastName
-    )
+    public async Task<TokenResult> RegisterAsync(string email, string password, string firstName, string lastName)
     {
         var existingUser = await _userManager.FindByEmailAsync(email);
         if (existingUser != null)
@@ -41,7 +37,7 @@ public class IdentityService(
             UserName = email,
             Email = email,
             FirstName = firstName,
-            LastName = lastName,
+            LastName = lastName
         };
 
         var result = await _userManager.CreateAsync(user, password);
@@ -51,24 +47,17 @@ public class IdentityService(
             throw new BusinessRuleException($"User registration failed: {errors}");
         }
 
-        //Assign standard role
         await _userManager.AddToRoleAsync(user, "Customer");
         var roles = await _userManager.GetRolesAsync(user);
 
-        //generate token upon successful registration
-        var token = _tokenGenerator.GenerateToken(user.Id, user.Email!, roles);
+        var tokenResult = _tokenGenerator.GenerateToken(user.Id, user.Email!, roles);
 
-        return new AuthResponseDto
-        {
-            UserId = user.Id,
-            Email = user.Email!,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            Token = token,
-        };
+        // Persist the Refresh Token in our database tracking table
+        await SaveRefreshTokenAsync(tokenResult.RefreshToken, tokenResult.JwtId, user.Id);
+
+        return tokenResult;
     }
-
-    public async Task<AuthResponseDto> LoginAsync(string email, string password)
+    public async Task<TokenResult> LoginAsync(string email, string password)
     {
         var user = await _userManager.FindByEmailAsync(email);
         if (user == null)
@@ -83,18 +72,76 @@ public class IdentityService(
         }
 
         var roles = await _userManager.GetRolesAsync(user);
-        var token = _tokenGenerator.GenerateToken(user.Id, user.Email!, roles);
+        var tokenResult = _tokenGenerator.GenerateToken(user.Id, user.Email!, roles);
 
-        return new AuthResponseDto
-        {
-            UserId = user.Id,
-            Email = user.Email!,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            Token = token,
-        };
+        await SaveRefreshTokenAsync(tokenResult.RefreshToken, tokenResult.JwtId, user.Id);
+
+        return tokenResult;
     }
 
+    public async Task<TokenResult> RefreshTokenAsync(string token)
+    {
+        // 1. Fetch token details
+        var storedToken = await _context.RefreshTokens
+            .FirstOrDefaultAsync(rt => rt.Token == token);
+
+        if (storedToken == null)
+        {
+            throw new BusinessRuleException("Invalid refresh token.");
+        }
+
+        // 2. TOKEN THEFT DETECTION (REUSE DETECTION)
+        if (storedToken.IsUsed)
+        {
+            // Theft suspected: Invalidate all active tokens for this User ID
+            var activeTokens = await _context.RefreshTokens
+                .Where(rt => rt.UserId == storedToken.UserId && !rt.IsRevoked)
+                .ToListAsync();
+
+            foreach (var t in activeTokens)
+            {
+                t.IsRevoked = true;
+                t.LastModifiedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            throw new BusinessRuleException("Token reuse detected. All sessions invalidated for security.");
+        }
+
+        if (storedToken.IsRevoked || DateTime.UtcNow > storedToken.ExpiryDate)
+        {
+            throw new BusinessRuleException("Refresh token has expired or has been revoked.");
+        }
+
+        // 3. Mark the current token as used
+        storedToken.IsUsed = true;
+        storedToken.LastModifiedAt = DateTime.UtcNow;
+
+        // 4. Generate a rotated token pair
+        var user = await _userManager.FindByIdAsync(storedToken.UserId)
+            ?? throw new BusinessRuleException("User associated with token does not exist.");
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var tokenResult = _tokenGenerator.GenerateToken(user.Id, user.Email!, roles);
+
+        await SaveRefreshTokenAsync(tokenResult.RefreshToken, tokenResult.JwtId, user.Id);
+        await _context.SaveChangesAsync();
+
+        return tokenResult;
+    }
+    private async Task SaveRefreshTokenAsync(string token, string jwtId, string userId)
+    {
+        var refreshToken = new RefreshToken
+        {
+            Token = token,
+            JwtId = jwtId,
+            UserId = userId,
+            ExpiryDate = DateTime.UtcNow.AddDays(7) // Valid for 7 days
+        };
+
+        _context.RefreshTokens.Add(refreshToken);
+        await _context.SaveChangesAsync();
+    }
     public async Task<UserProfileDto> GetProfileAsync(string userId)
     {
         var user =

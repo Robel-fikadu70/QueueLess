@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -7,23 +8,20 @@ using QueueLess.Application.Interfaces;
 
 namespace QueueLess.Infrastructure.Identity;
 
-public class JwtTokenGenerator : IJwtTokenGenerator
+public class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerator
 {
-    private readonly IConfiguration _configuration;
+    private readonly IConfiguration _configuration = configuration;
 
-    public JwtTokenGenerator(IConfiguration configuration)
+    public TokenResult GenerateToken(string userId, string email, IEnumerable<string> roles)
     {
-        _configuration = configuration;
-    }
+        var jwtId = Guid.NewGuid().ToString();
 
-    public string GenerateToken(string userId, string email, IEnumerable<string> roles)
-    {
         // Set up the list of claims (user identity statements)
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId),
             new(JwtRegisteredClaimNames.Email, email),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Jti, jwtId),
         };
 
         //Add user roles as claims for role-based authorization
@@ -38,15 +36,27 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        //Define the toke options
+        // Short-Lived Access Token: Valid for only 15 minutes
         var token = new JwtSecurityToken(
             issuer: _configuration["JwtSettings:Issuer"],
             audience: _configuration["JwtSettings:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddDays(7), //Token Validity limit
+            expires: DateTime.UtcNow.AddMinutes(15), 
             signingCredentials: creds
         );
+        var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+        
+        // Long-Lived Cryptographically Secure Refresh Token
+        var refreshToken = GenerateSecureRandomString();
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return new TokenResult(accessToken, refreshToken, jwtId);
+    }
+
+    private static string GenerateSecureRandomString()
+    {
+        var randomNumber = new byte[64];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomNumber);
+        return Convert.ToBase64String(randomNumber);
     }
 }

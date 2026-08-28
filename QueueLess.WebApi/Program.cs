@@ -50,19 +50,6 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["JwtSettings:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
     };
-
-    //INTERCEPT THE REQ: Retrive the token from the secure cookie instead of headers
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
-        {
-            if (context.Request.Cookies.TryGetValue("X-Access-Token", out var token))
-            {
-                context.Token = token;
-            }
-            return Task.CompletedTask;
-        }
-    };
 });
 
 builder.Services.AddControllers();

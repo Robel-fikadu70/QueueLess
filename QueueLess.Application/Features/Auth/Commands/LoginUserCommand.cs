@@ -9,13 +9,13 @@ namespace QueueLess.Application.Features.Auth.Commands;
 public record LoginUserCommand(
     string Email,
     string Password
-) : IRequest<AuthResponseDto>;
+) : IRequest<TokenResult>;
 
-public class LoginUserCommandHandler(IIdentityService identityService) : IRequestHandler<LoginUserCommand, AuthResponseDto>
+public class LoginUserCommandHandler(IIdentityService identityService) : IRequestHandler<LoginUserCommand, TokenResult>
 {
     private readonly IIdentityService _identityService = identityService;
 
-    public async Task<AuthResponseDto> Handle(LoginUserCommand request, CancellationToken cancellationToken)
+    public async Task<TokenResult> Handle(LoginUserCommand request, CancellationToken cancellationToken)
     {
         return await _identityService.LoginAsync(request.Email, request.Password);
     }
