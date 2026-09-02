@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.Interfaces;
 using QueueLess.Domain.Enums;
+using QueueLess.Domain.Exceptions;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,12 +26,12 @@ public class CheckInTicketCommandHandler(IQlDbContext context, ICurrentUserServi
 
         if (ticket == null)
         {
-            throw new InvalidOperationException("Ticket record not found.");
+            throw new BusinessRuleException("Ticket record not found.");
         }
 
         if (ticket.State != TicketState.Waiting && ticket.State != TicketState.Called)
         {
-            throw new InvalidOperationException("You can only check in for an active waiting or called ticket.");
+            throw new BusinessRuleException("You can only check in for an active waiting or called ticket.");
         }
 
         // Record arrival timestamp

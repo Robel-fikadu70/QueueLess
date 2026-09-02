@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.DTOs.Tickets;
 using QueueLess.Application.Interfaces;
 using QueueLess.Domain.Enums;
+using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Application.Features.Tickets.Queries;
 
@@ -25,7 +26,7 @@ public class GetTicketDashboardQueryHandler(IQlDbContext context, ICurrentUserSe
 
         if (ticket == null)
         {
-            throw new InvalidOperationException("Active ticket not found.");
+            throw new BusinessRuleException("Active ticket not found.");
         }
 
         var today = DateTime.UtcNow.Date;

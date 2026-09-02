@@ -9,11 +9,14 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
 {
     private readonly ILogger<GlobalExceptionHandler> _logger = logger;
 
-    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
+    public async ValueTask<bool> TryHandleAsync(
+     HttpContext httpContext,
+     Exception exception,
+     CancellationToken cancellationToken)
     {
-        _logger.LogError(exception, "An unhandled exception occurred: {Message}", exception.Message);
+        // REMOVED: The global _logger.LogError line from the top is gone.
+        // This prevents logging stack traces for expected business/validation mistakes.
 
-        //default error patterns
         var statusCode = StatusCodes.Status500InternalServerError;
         var title = "Server Error";
         var detail = "An unexpected error occurred on the server.";
@@ -25,24 +28,34 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 statusCode = StatusCodes.Status400BadRequest;
                 title = "Validation Error";
                 detail = "One or more validation checks failed.";
-                // Format FluentValidation error paths into a structured dictionary
                 errors = validationException.Errors
                     .GroupBy(e => e.PropertyName)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()
-                    );
+                    .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+
+                // Logged as a clean, single-line warning (No stack trace)
+                _logger.LogWarning("Input validation failed for path: {Path}", httpContext.Request.Path);
                 break;
 
             case BusinessRuleException businessException:
                 statusCode = StatusCodes.Status400BadRequest;
                 title = "Business Rule Violation";
                 detail = businessException.Message;
+
+                // Logged as a clean, single-line warning (No stack trace)
+                _logger.LogWarning("Business rule violated: {Message} on path: {Path}", businessException.Message, httpContext.Request.Path);
                 break;
+
             case UnauthorizedAccessException:
                 statusCode = StatusCodes.Status401Unauthorized;
                 title = "Unauthorized";
                 detail = "You are not authorized to perform this operation.";
+
+                _logger.LogWarning("Unauthorized access attempt on path: {Path}", httpContext.Request.Path);
+                break;
+
+            default:
+                // Unhandled system exceptions (like database crashes) are logged as errors with full stack traces
+                _logger.LogError(exception, "A critical unhandled server exception occurred on path: {Path}", httpContext.Request.Path);
                 break;
         }
 
@@ -50,13 +63,12 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
         {
             Status = statusCode,
             Title = title,
-            Type = $"http://httpstatuses.io/{statusCode}",
+            Type = $"https://httpstatuses.io/{statusCode}",
             Detail = detail,
             Instance = httpContext.Request.Path
         };
 
-        //If there are detailed validation error lists, attach'em
-        if(errors != null)
+        if (errors != null)
         {
             problemDetails.Extensions["errors"] = errors;
         }
