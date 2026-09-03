@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.Interfaces;
+using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Application.Features.Facilities.Commands;
 
@@ -16,7 +17,7 @@ public class DeleteFacilityCommandHandler(IQlDbContext context) : IRequestHandle
 
         if(facility == null)
         {
-            throw new InvalidOperationException("Facility not found.");
+            throw new BusinessRuleException("Facility not found.");
         }
 
         //Soft delete

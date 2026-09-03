@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using QueueLess.Application.DTOs.F_Services;
 using QueueLess.Application.Features.FServices.Commands;
 using QueueLess.Application.Features.FServices.Queries;
 using QueueLess.Domain.Entities;
@@ -34,14 +35,25 @@ public class ServicesController(ISender sender) : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateServiceCommand command)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateServiceRequest request)
     {
-        if (id != command.Id)
-        {
-            return BadRequest("Mismatched identifier values.");
-        }
+        var command = new UpdateServiceCommand(
+            id,
+            request.Name,
+            request.Description,
+            request.EstimatedDurationMinutes
+        );
 
         await _sender.Send(command);
+        return NoContent();
+    }
+
+    [HttpPatch("{id:guid}/status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] bool isActive)
+    {
+        await _sender.Send(new UpdateServiceStatusCommand(id, isActive));
+
         return NoContent();
     }
 }

@@ -146,7 +146,7 @@ public class IdentityService(
     {
         var user =
             await _userManager.FindByIdAsync(userId)
-            ?? throw new InvalidOperationException("User not found.");
+            ?? throw new BusinessRuleException("User not found.");
         return new UserProfileDto
         {
             Email = user.Email!,
@@ -159,7 +159,7 @@ public class IdentityService(
     {
         var user =
             await _userManager.FindByIdAsync(userId)
-            ?? throw new InvalidOperationException("User not found.");
+            ?? throw new BusinessRuleException("User not found.");
 
         user.FirstName = firstName;
         user.LastName = lastName;
@@ -174,11 +174,13 @@ public class IdentityService(
         string lastName
     )
     {
-        var existingUser = _userManager.FindByEmailAsync(email);
+        var existingUser = await _userManager.FindByEmailAsync(email);
+        
         if (existingUser != null)
         {
-            throw new InvalidOperationException("Email address is already in use.");
+            throw new BusinessRuleException("Email address is already in use.");
         }
+        
 
         var user = new ApplicationUser
         {
@@ -192,7 +194,7 @@ public class IdentityService(
         if (!result.Succeeded)
         {
             var error = string.Join("; ", result.Errors.Select(e => e.Description));
-            throw new InvalidOperationException($"Staff Registration failed: {error}");
+            throw new BusinessRuleException($"Staff Registration failed: {error}");
         }
 
         await _userManager.AddToRoleAsync(user, "Staff");

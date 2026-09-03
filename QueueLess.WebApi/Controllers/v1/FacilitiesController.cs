@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using QueueLess.Application.DTOs.Facility;
 using QueueLess.Application.Features.Facilities.Commands;
 using QueueLess.Application.Features.Facilities.Queries;
 using QueueLess.Domain.Entities;
@@ -31,14 +32,28 @@ public class FacilitiesController(ISender sender) : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFacilityCommand command)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFacilityRequest request)
     {
-        if (id != command.Id)
-        {
-            return BadRequest("Mismatched identifier values.");
-        }
+        var command = new UpdateFacilityCommand
+        (
+            id,
+            request.Name,
+            request.Description,
+            request.Location,
+            request.OperatingHours
+        );
 
         await _sender.Send(command);
+        return NoContent();
+    }
+    [HttpPatch("{id:guid}/status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateFacilityStatusRequest request)
+    {
+
+        await _sender.Send(
+            new UpdateFacilityStatusCommand(id, request.Status)
+        );
         return NoContent();
     }
 
