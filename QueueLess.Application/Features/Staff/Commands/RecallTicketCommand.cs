@@ -10,10 +10,11 @@ namespace QueueLess.Application.Features.Staff.Commands;
 
 public record RecallTicketCommand(Guid TicketId) : IRequest<Unit>;
 
-public class RecallTicketCommandHandler(IQlDbContext context, ICurrentUserService currentUserService) : IRequestHandler<RecallTicketCommand, Unit>
+public class RecallTicketCommandHandler(IQlDbContext context, ICurrentUserService currentUserService, IQueueNotificationService queueNotificationService) : IRequestHandler<RecallTicketCommand, Unit>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly IQueueNotificationService _notificationService = queueNotificationService;
 
     public async Task<Unit> Handle(RecallTicketCommand request, CancellationToken cancellationToken)
     {
@@ -39,6 +40,17 @@ public class RecallTicketCommandHandler(IQlDbContext context, ICurrentUserServic
         ticket.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Notify the customer they are being recalled
+        await _notificationService.NotifyTicketStatusChangedAsync(
+            ticket.CustomerId, 
+            ticket.Id, 
+            ticket.TicketNumber, 
+            ticket.State.ToString().ToUpper());
+
+        // REAL-TIME BROADCAST: Notify staff dashboard to refresh lists
+        await _notificationService.NotifyQueuePositionChangedAsync(ticket.ServiceId);
+ 
 
         return Unit.Value;
     }

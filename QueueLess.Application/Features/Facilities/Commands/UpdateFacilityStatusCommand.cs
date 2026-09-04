@@ -6,19 +6,20 @@ using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Application.Features.Facilities.Commands;
 
-public record UpdateFacilityCommand(
+public record UpdateFacilityStatusCommand(
     Guid Id,
-    string Name,
-    string? Description,
-    string Location,
-    string OperatingHours
+    QueueStatus Status
 ) : IRequest<Unit>;
 
-public class UpdateFacilityCommandHandler(IQlDbContext context) : IRequestHandler<UpdateFacilityCommand, Unit>
+public class UpdateFacilityStatusCommandHandler(
+    IQlDbContext context
+) : IRequestHandler<UpdateFacilityStatusCommand, Unit>
 {
     private readonly IQlDbContext _context = context;
 
-    public async Task<Unit> Handle(UpdateFacilityCommand request, CancellationToken cancellationToken)
+    public async Task<Unit> Handle(
+        UpdateFacilityStatusCommand request,
+        CancellationToken cancellationToken)
     {
         var facility = await _context.Facilities.FirstOrDefaultAsync(f => f.Id == request.Id, cancellationToken);
 
@@ -27,10 +28,7 @@ public class UpdateFacilityCommandHandler(IQlDbContext context) : IRequestHandle
             throw new BusinessRuleException("Facility not found.");
         }
 
-        facility.Name = request.Name;
-        facility.Description = request.Description;
-        facility.Location = request.Location;
-        facility.OperatingHours = request.OperatingHours;
+        facility.Status = request.Status;
         facility.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);

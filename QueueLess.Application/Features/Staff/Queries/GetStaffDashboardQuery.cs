@@ -29,14 +29,14 @@ public class GetStaffDashboardQueryHandler(IQlDbContext context, ICurrentUserSer
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.ServiceId == request.ServiceId 
                                    && t.ServedByStaffId == staffId 
-                                   && (t.State == TicketState.Called || t.State == TicketState.Serving) 
+                                   && (t.State == TicketState.Called || t.State == TicketState.Serving || t.State == TicketState.CheckedIn) 
                                    && t.CreatedAt >= today, cancellationToken);
 
         // 2. Fetch all tickets currently waiting in line
         var waitingList = await _context.Tickets
             .AsNoTracking()
-            .Where(t => t.ServiceId == request.ServiceId 
-                     && t.State == TicketState.Waiting 
+            .Where(t => t.ServiceId == request.ServiceId && t.ServedByStaffId == null
+                     && (t.State == TicketState.Waiting || t.State == TicketState.CheckedIn )
                      && t.CreatedAt >= today)
             .OrderBy(t => t.SequenceNumber)
             .ToListAsync(cancellationToken);

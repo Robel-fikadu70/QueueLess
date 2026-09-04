@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.Interfaces;
+using QueueLess.Domain.Exceptions;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,8 +12,7 @@ public record UpdateServiceCommand(
     Guid Id,
     string Name,
     string? Description,
-    int EstimatedDurationMinutes,
-    bool IsActive
+    int EstimatedDurationMinutes
 ) : IRequest<Unit>;
 
 public class UpdateServiceCommandHandler(IQlDbContext context) : IRequestHandler<UpdateServiceCommand, Unit>
@@ -25,13 +25,12 @@ public class UpdateServiceCommandHandler(IQlDbContext context) : IRequestHandler
 
         if (service == null)
         {
-            throw new InvalidOperationException("Facility Service not found.");
+            throw new BusinessRuleException("Facility Service not found.");
         }
 
         service.Name = request.Name;
         service.Description = request.Description;
         service.EstimatedDurationMinutes = request.EstimatedDurationMinutes;
-        service.IsActive = request.IsActive;
         service.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);

@@ -7,8 +7,9 @@ namespace QueueLess.Application.Interfaces;
 
 public interface IIdentityService
 {
-    Task<AuthResponseDto> RegisterAsync(string email, string password, string firstName, string lastName);
-    Task<AuthResponseDto> LoginAsync(string email, string password);
+    Task<TokenResult> RegisterAsync(string email, string password, string firstName, string lastName);
+    Task<TokenResult> LoginAsync(string email, string password);
+    Task<TokenResult> RefreshTokenAsync(string token); // Token Rotation with Theft Detection
     Task<UserProfileDto> GetProfileAsync(string userId);
     Task UpdateProfileAsync(string userId, string firstName, string lastName);
     Task<string> RegisterStaffAsync(string email, string password, string firstName, string lastName);

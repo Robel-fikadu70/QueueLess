@@ -2,7 +2,9 @@ using System.Collections.Generic;
 
 namespace QueueLess.Application.Interfaces;
 
+public record TokenResult(string AccessToken, string RefreshToken, string JwtId);
+
 public interface IJwtTokenGenerator
 {
-    string GenerateToken(string userId, string email, IEnumerable<string> roles);
+    TokenResult GenerateToken(string userId, string email, IEnumerable<string> roles);
 }

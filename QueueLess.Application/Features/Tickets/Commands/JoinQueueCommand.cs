@@ -3,15 +3,17 @@ using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.Interfaces;
 using QueueLess.Domain.Entities;
 using QueueLess.Domain.Enums;
+using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Application.Features.Tickets.Commands;
 
 public record JoinQueueCommand(Guid ServiceId) : IRequest<Guid>;
 
-public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService currentUserService) : IRequestHandler<JoinQueueCommand, Guid>
+public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService currentUserService, IQueueNotificationService queueNotificationService) : IRequestHandler<JoinQueueCommand, Guid>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly IQueueNotificationService _notificationService = queueNotificationService;
 
     public async Task<Guid> Handle(JoinQueueCommand request, CancellationToken cancellationToken)
     {
@@ -25,12 +27,12 @@ public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService c
 
         if (service == null || !service.IsActive)
         {
-            throw new InvalidOperationException("The requested service queue is inactive or does not exist.");
+            throw new BusinessRuleException("The requested service queue is inactive or does not exist.");
         }
 
         if (service.Facility!.Status != QueueStatus.Open)
         {
-            throw new InvalidOperationException("The facility hosting this queue is currently closed or paused.");
+            throw new BusinessRuleException("The facility hosting this queue is currently closed or paused.");
         }
 
         // Check if the user is already waiting in this specific service queue
@@ -38,12 +40,12 @@ public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService c
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.ServiceId == request.ServiceId
                                    && t.CustomerId == customerId
-                                   && (t.State == TicketState.Waiting || t.State == TicketState.Called || t.State == TicketState.Serving),
+                                   && (t.State == TicketState.Waiting || t.State == TicketState.CheckedIn || t.State == TicketState.Called || t.State == TicketState.Serving),
                                  cancellationToken);
 
         if (existingTicket != null)
         {
-            throw new InvalidOperationException("You are already active in this queue.");
+            throw new BusinessRuleException("You are already active in this queue.");
         }
 
         // Calculate sequence number resetting daily per service queue
@@ -72,6 +74,9 @@ public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService c
 
         _context.Tickets.Add(ticket);
         await _context.SaveChangesAsync(cancellationToken);
+
+        //notify both staff and customers to update waiting lists
+        await _notificationService.NotifyQueuePositionChangedAsync(ticket.ServiceId);
 
         return ticket.Id;
     }

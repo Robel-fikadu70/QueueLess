@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.DTOs.Tickets;
 using QueueLess.Application.Interfaces;
 using QueueLess.Domain.Enums;
+using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Application.Features.Tickets.Queries;
 
@@ -25,14 +26,14 @@ public class GetTicketDashboardQueryHandler(IQlDbContext context, ICurrentUserSe
 
         if (ticket == null)
         {
-            throw new InvalidOperationException("Active ticket not found.");
+            throw new BusinessRuleException("Active ticket not found.");
         }
 
         var today = DateTime.UtcNow.Date;
 
         // 1. Calculate ppl ahead(Ticket created today with an earlier sequence number still in the waiting state)
         var peopleAhead = await _context.Tickets.CountAsync(t => t.ServiceId == ticket.ServiceId
-                                                            && t.State == TicketState.Waiting
+                                                            && (t.State == TicketState.Waiting || t.State == TicketState.CheckedIn )
                                                             && t.SequenceNumber < ticket.SequenceNumber
                                                             && t.CreatedAt >= today, cancellationToken);
 
@@ -82,7 +83,7 @@ public class GetTicketDashboardQueryHandler(IQlDbContext context, ICurrentUserSe
             CurrentTicketBeingServed = currentTicketNumber,
             EstimatedWaitRange = waitingRange,
             QueueStatus = ticket.Service.Facility.Status.ToString().ToUpper(),
-            CheckInStatus = ticket.CheckedInAt.HasValue ? "Checked In" : "Pending Check-In"
+            CheckInStatus = ticket.State 
         };
 
     }

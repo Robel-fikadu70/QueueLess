@@ -11,13 +11,13 @@ public record RegisterUserCommand(
     string Password,
     string FirstName,
     string LastName
-) : IRequest<AuthResponseDto>;
+) : IRequest<TokenResult>;
 
-public class RegisterUserCommandHandler(IIdentityService identityService) : IRequestHandler<RegisterUserCommand, AuthResponseDto>
+public class RegisterUserCommandHandler(IIdentityService identityService) : IRequestHandler<RegisterUserCommand, TokenResult>
 {
     private readonly IIdentityService _identityService = identityService;
 
-    public async Task<AuthResponseDto> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
+    public async Task<TokenResult> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         return await _identityService.RegisterAsync(
             request.Email, 

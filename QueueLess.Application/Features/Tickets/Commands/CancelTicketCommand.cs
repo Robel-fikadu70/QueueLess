@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.Interfaces;
 using QueueLess.Domain.Enums;
+using QueueLess.Domain.Exceptions;
 
 namespace QueueLess.Application.Features.Tickets.Commands;
 public record CancelTicketCommand(Guid TicketId): IRequest<Unit>;
@@ -20,11 +21,11 @@ public class CancelTicketCommandHandler(IQlDbContext qlDbContext, ICurrentUserSe
 
         if(ticket == null)
         {
-            throw new InvalidOperationException("Ticket not found.");
+            throw new BusinessRuleException("Ticket not found.");
         }
         if(ticket.State != TicketState.Waiting && ticket.State != TicketState.Called)
         {
-            throw new InvalidOperationException("You can only cancle waiting or called tickets.");
+            throw new BusinessRuleException("You can only cancle waiting or called tickets.");
         }
 
         ticket.State = TicketState.Cancelled;

@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using QueueLess.Application;
@@ -12,6 +13,7 @@ using QueueLess.Application.Interfaces;
 using QueueLess.Infrastructure;
 using QueueLess.Infrastructure.Identity;
 using QueueLess.Infrastructure.Persistence;
+using QueueLess.WebApi.Middleware;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,11 +21,17 @@ var builder = WebApplication.CreateBuilder(args);
 // module services registration
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureService(builder.Configuration);
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
-// Configure Antiforgery to look for the Angular default header
+// Configure Antiforgery validation for statu changing operations (POST, PUT, DELETE)
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+});
 builder.Services.AddAntiforgery(options =>
 {
-    options.HeaderName = "X-XSRF-TOKEN";
+    options.HeaderName = "X-XSRF-TOKEN"; //Angular default header
 });
 
 // Jwt Authentication configuration
@@ -48,12 +56,12 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
     };
 
-    //INTERCEPT THE REQ: Retrive the token from the secure cookie instead of headers
+    //Intercept the REQ: Retrieve the access token from secure cookie instead of headers
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
         {
-            if (context.Request.Cookies.TryGetValue("X-Access-Token", out var token))
+            if(context.Request.Cookies.TryGetValue("X-Access-Token", out var token))
             {
                 context.Token = token;
             }
@@ -62,13 +70,19 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews(
+    options =>
+    {
+        options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+    }
+);
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSignalR();
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -90,7 +104,7 @@ app.Use((context, next) =>
     var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
     var tokens = antiforgery.GetAndStoreTokens(context);
     
-    // This cookie MUST have HttpOnly = false so Angular can read it, but
+    // HttpOnly = false so Angular can read it, but
     // SameSite=Lax and Secure=true ensures security over the network.
     context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
     {

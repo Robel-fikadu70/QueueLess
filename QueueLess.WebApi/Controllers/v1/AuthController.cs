@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using QueueLess.Application.DTOs.Auth;
+using QueueLess.Application.DTOs.Users;
 using QueueLess.Application.Features.Auth.Commands;
+using QueueLess.Application.Features.Users.Queries;
 
 namespace QueueLess.WebApi.Controllers.v1;
 
@@ -16,18 +18,51 @@ public class AuthController(ISender sender, IWebHostEnvironment env) : Controlle
     private readonly IWebHostEnvironment _env = env;
 
     [HttpPost("register")]
-    public async Task<ActionResult<AuthResponseDto>> Register([FromBody] RegisterUserCommand command)
+    [IgnoreAntiforgeryToken] //ignored during registration cause no session exists to forge
+    public async Task<IActionResult> Register([FromBody] RegisterUserCommand command)
     {
         var result = await _sender.Send(command);
-        SetTokenCookie(result.Token);
-        return Ok(result);
+        //write both tokens to secure httpOnly cookies
+        SetTokenCookies(result.AccessToken, result.RefreshToken);
+        
+        // Return AccessToken in response body
+        return NoContent();
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginUserCommand command)
+    [IgnoreAntiforgeryToken] 
+    public async Task<IActionResult> Login([FromBody] LoginUserCommand command)
     {
         var result = await _sender.Send(command);
-        SetTokenCookie(result.Token);
+
+        SetTokenCookies(result.AccessToken, result.RefreshToken);
+        
+        return NoContent();
+    }
+
+    [HttpPost("refresh")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Refresh()
+    {
+        // 1. Extract the secure refresh token cookie from the request
+        if (!Request.Cookies.TryGetValue("X-Refresh-Token", out var refreshToken))
+        {
+            return Unauthorized("Refresh token is missing.");
+        }
+
+        // 2. Perform rotation and theft detection check
+        var result = await _sender.Send(new RefreshTokenCommand(refreshToken));
+        
+        SetTokenCookies(result.AccessToken, result.RefreshToken);
+
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<UserProfileDto>> GetCurrentUser()
+    {
+        var result = await _sender.Send(new GetUserProfileQuery());
         return Ok(result);
     }
 
@@ -35,23 +70,35 @@ public class AuthController(ISender sender, IWebHostEnvironment env) : Controlle
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        //Expire the access cookie immediately to clear the user's session
+        //Delete both cookies form the browser
         Response.Cookies.Delete("X-Access-Token");
+        Response.Cookies.Delete("X-Refresh-Token");
         return NoContent();
     }
 
-    //secure cookie generation helper
-    private void SetTokenCookie(string token)
+    private void SetTokenCookies(string accessToken, string refreshToken)
     {
-        var IsDevelopment = _env.IsDevelopment();
-        var cookieOptions = new CookieOptions
+        var isDevelopment = _env.IsDevelopment();
+
+        // Write the short lived access token cookie
+        var accessOptions = new CookieOptions
         {
-            HttpOnly = true, //strictly hides token from JS XSS attacks
-            Secure = !IsDevelopment,
-            SameSite = SameSiteMode.Strict, //Strict prevents CSRT cross-origin submissions
-            Expires = DateTimeOffset.UtcNow.AddDays(7)
+            HttpOnly = true,
+            Secure = !isDevelopment,
+            SameSite = isDevelopment ? SameSiteMode.Lax : SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddMinutes(15)
+        };
+        Response.Cookies.Append("X-Access-Token", accessToken, accessOptions);
+
+        // write the long lived refresh token
+        var refreshOptions = new CookieOptions
+        {
+            HttpOnly = true, // Hide completely from JavaScript (No XSS risks)
+            Secure = !isDevelopment, 
+            SameSite = isDevelopment ? SameSiteMode.Lax : SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddDays(7) // Valid for 7 days
         };
 
-        Response.Cookies.Append("X-Access-Token", token, cookieOptions);
+        Response.Cookies.Append("X-Refresh-Token", refreshToken, refreshOptions);
     }
 }

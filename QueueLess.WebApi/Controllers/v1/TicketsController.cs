@@ -36,7 +36,7 @@ public class TicketController(ISender sender) : ControllerBase
         return Ok(result);
     }
     [HttpGet("history")]
-    public async Task<ActionResult<System.Collections.Generic.IEnumerable<QueueLess.Domain.Entities.Ticket>>> GetHistory()
+    public async Task<ActionResult<TicketHistoryDto>> GetHistory()
     {
         var result = await _sender.Send(new GetTicketHistoryQuery());
         return Ok(result);
@@ -48,4 +48,10 @@ public class TicketController(ISender sender) : ControllerBase
         await _sender.Send(new CancelTicketCommand(id));
         return NoContent();
     }
+    [HttpGet("active")]
+public async Task<ActionResult<TicketHistoryDto>> GetActive()
+{
+    var result = await _sender.Send(new GetActiveTicketsQuery());
+    return Ok(result);
+}
 }

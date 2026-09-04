@@ -2,25 +2,29 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.DTOs.Tickets;
 using QueueLess.Application.Interfaces;
-using QueueLess.Domain.Entities;
 using QueueLess.Domain.Enums;
 
 namespace QueueLess.Application.Features.Tickets.Queries;
 
-public record GetTicketHistoryQuery : IRequest<IEnumerable<TicketHistoryDto>>;
+public record GetActiveTicketsQuery : IRequest<IEnumerable<TicketHistoryDto>>;
 
-public class GetTicketHistoryQueryHandler(IQlDbContext context, ICurrentUserService currentUser) : IRequestHandler<GetTicketHistoryQuery, IEnumerable<TicketHistoryDto>>
+public class GetActiveTicketsQueryHandler(IQlDbContext context, ICurrentUserService currentUser) : IRequestHandler<GetActiveTicketsQuery, IEnumerable<TicketHistoryDto>>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUser = currentUser;
 
-    public async Task<IEnumerable<TicketHistoryDto>> Handle(GetTicketHistoryQuery request, CancellationToken cancellationToken)
+    public async Task<IEnumerable<TicketHistoryDto>> Handle(GetActiveTicketsQuery request, CancellationToken cancellationToken)
     {
         var userId = _currentUser.UserId ?? throw new UnauthorizedAccessException();
+
+        var today = DateTime.UtcNow.Date;
+
+        // Fetch only active, un-completed tickets created today for the user
         return await _context.Tickets
             .AsNoTracking()
-            .Where(t => t.CustomerId == userId
-                     && (t.State == TicketState.Completed || t.State == TicketState.Cancelled || t.State == TicketState.NoShow))
+            .Where(t => t.CustomerId == userId 
+                     && (t.State == TicketState.Waiting || t.State == TicketState.Called || t.State == TicketState.Serving)
+                     && t.CreatedAt >= today)
             .OrderByDescending(t => t.CreatedAt)
             .Select(t => new TicketHistoryDto
             {
