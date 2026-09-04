@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using QueueLess.Application.DTOs.Auth;
+using QueueLess.Application.DTOs.Users;
 using QueueLess.Application.Features.Auth.Commands;
+using QueueLess.Application.Features.Users.Queries;
 
 namespace QueueLess.WebApi.Controllers.v1;
 
@@ -16,55 +18,80 @@ public class AuthController(ISender sender, IWebHostEnvironment env) : Controlle
     private readonly IWebHostEnvironment _env = env;
 
     [HttpPost("register")]
+    [IgnoreAntiforgeryToken] //ignored during registration cause no session exists to forge
     public async Task<IActionResult> Register([FromBody] RegisterUserCommand command)
     {
         var result = await _sender.Send(command);
-        SetRefreshTokenCookie(result.RefreshToken);
+        //write both tokens to secure httpOnly cookies
+        SetTokenCookies(result.AccessToken, result.RefreshToken);
         
         // Return AccessToken in response body
-        return Ok(new { AccessToken = result.AccessToken });
+        return NoContent();
     }
 
     [HttpPost("login")]
+    [IgnoreAntiforgeryToken] 
     public async Task<IActionResult> Login([FromBody] LoginUserCommand command)
     {
         var result = await _sender.Send(command);
-        SetRefreshTokenCookie(result.RefreshToken);
+
+        SetTokenCookies(result.AccessToken, result.RefreshToken);
         
-        return Ok(new { AccessToken = result.AccessToken });
+        return NoContent();
     }
 
     [HttpPost("refresh")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Refresh()
     {
         // 1. Extract the secure refresh token cookie from the request
         if (!Request.Cookies.TryGetValue("X-Refresh-Token", out var refreshToken))
         {
-            return BadRequest("Refresh token is missing.");
+            return Unauthorized("Refresh token is missing.");
         }
 
         // 2. Perform rotation and theft detection check
         var result = await _sender.Send(new RefreshTokenCommand(refreshToken));
         
-        // 3. Append the newly rotated refresh token cookie
-        SetRefreshTokenCookie(result.RefreshToken);
+        SetTokenCookies(result.AccessToken, result.RefreshToken);
 
-        return Ok(new { AccessToken = result.AccessToken });
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<UserProfileDto>> GetCurrentUser()
+    {
+        var result = await _sender.Send(new GetUserProfileQuery());
+        return Ok(result);
     }
 
     [Authorize]
     [HttpPost("logout")]
     public IActionResult Logout()
     {
+        //Delete both cookies form the browser
+        Response.Cookies.Delete("X-Access-Token");
         Response.Cookies.Delete("X-Refresh-Token");
         return NoContent();
     }
 
-    private void SetRefreshTokenCookie(string token)
+    private void SetTokenCookies(string accessToken, string refreshToken)
     {
         var isDevelopment = _env.IsDevelopment();
 
-        var cookieOptions = new CookieOptions
+        // Write the short lived access token cookie
+        var accessOptions = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !isDevelopment,
+            SameSite = isDevelopment ? SameSiteMode.Lax : SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddMinutes(15)
+        };
+        Response.Cookies.Append("X-Access-Token", accessToken, accessOptions);
+
+        // write the long lived refresh token
+        var refreshOptions = new CookieOptions
         {
             HttpOnly = true, // Hide completely from JavaScript (No XSS risks)
             Secure = !isDevelopment, 
@@ -72,6 +99,6 @@ public class AuthController(ISender sender, IWebHostEnvironment env) : Controlle
             Expires = DateTimeOffset.UtcNow.AddDays(7) // Valid for 7 days
         };
 
-        Response.Cookies.Append("X-Refresh-Token", token, cookieOptions);
+        Response.Cookies.Append("X-Refresh-Token", refreshToken, refreshOptions);
     }
 }
