@@ -9,10 +9,11 @@ namespace QueueLess.Application.Features.Tickets.Commands;
 
 public record JoinQueueCommand(Guid ServiceId) : IRequest<Guid>;
 
-public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService currentUserService) : IRequestHandler<JoinQueueCommand, Guid>
+public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService currentUserService, IQueueNotificationService queueNotificationService) : IRequestHandler<JoinQueueCommand, Guid>
 {
     private readonly IQlDbContext _context = context;
     private readonly ICurrentUserService _currentUserService = currentUserService;
+    private readonly IQueueNotificationService _notificationService = queueNotificationService;
 
     public async Task<Guid> Handle(JoinQueueCommand request, CancellationToken cancellationToken)
     {
@@ -73,6 +74,9 @@ public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService c
 
         _context.Tickets.Add(ticket);
         await _context.SaveChangesAsync(cancellationToken);
+
+        //notify both staff and customers to update waiting lists
+        await _notificationService.NotifyQueuePositionChangedAsync(ticket.ServiceId);
 
         return ticket.Id;
     }
