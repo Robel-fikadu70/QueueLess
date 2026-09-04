@@ -147,11 +147,14 @@ public class IdentityService(
         var user =
             await _userManager.FindByIdAsync(userId)
             ?? throw new BusinessRuleException("User not found.");
+
+        var role = await _userManager.GetRolesAsync(user);
         return new UserProfileDto
         {
             Email = user.Email!,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            Role = role[0]
         };
     }
 

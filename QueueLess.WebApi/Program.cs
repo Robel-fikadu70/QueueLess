@@ -70,7 +70,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddControllers(
+builder.Services.AddControllersWithViews(
     options =>
     {
         options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
