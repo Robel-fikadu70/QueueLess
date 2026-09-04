@@ -149,6 +149,21 @@ public class IdentityService(
             ?? throw new BusinessRuleException("User not found.");
 
         var role = await _userManager.GetRolesAsync(user);
+
+        if (role.Contains("Staff"))
+        {
+            var assignment = await _context.StaffAssignments.Include(sa => sa.Service).FirstOrDefaultAsync(sa => sa.StaffId == user.Id && sa.IsActive);
+            return new StaffProfileDto
+            {
+                Email = user.Email!,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Role = role[0],
+                AssignedServiceId = assignment?.ServiceId,
+                AssignedServiceName = assignment?.Service?.Name,
+                CounterNumber = assignment?.CounterNumber
+            };
+        }
         return new UserProfileDto
         {
             Email = user.Email!,

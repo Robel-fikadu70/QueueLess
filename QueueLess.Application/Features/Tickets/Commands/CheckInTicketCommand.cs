@@ -35,6 +35,7 @@ public class CheckInTicketCommandHandler(IQlDbContext context, ICurrentUserServi
         }
 
         // Record arrival timestamp
+        ticket.State = TicketState.CheckedIn;
         ticket.CheckedInAt = DateTime.UtcNow;
         ticket.LastModifiedAt = DateTime.UtcNow;
 

@@ -39,7 +39,7 @@ public class JoinQueueCommandHandler(IQlDbContext context, ICurrentUserService c
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.ServiceId == request.ServiceId
                                    && t.CustomerId == customerId
-                                   && (t.State == TicketState.Waiting || t.State == TicketState.Called || t.State == TicketState.Serving),
+                                   && (t.State == TicketState.Waiting || t.State == TicketState.CheckedIn || t.State == TicketState.Called || t.State == TicketState.Serving),
                                  cancellationToken);
 
         if (existingTicket != null)

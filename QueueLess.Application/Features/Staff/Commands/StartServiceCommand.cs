@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QueueLess.Application.Interfaces;
 using QueueLess.Domain.Enums;
+using QueueLess.Domain.Exceptions;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,12 +27,12 @@ public class StartServiceCommandHandler(IQlDbContext context, ICurrentUserServic
 
         if (ticket == null)
         {
-            throw new InvalidOperationException("Ticket assignment not found.");
+            throw new BusinessRuleException("Ticket assignment not found.");
         }
 
-        if (ticket.State != TicketState.Called)
+        if (ticket.State != TicketState.Called && ticket.State != TicketState.CheckedIn)
         {
-            throw new InvalidOperationException("Service can only begin on a called ticket.");
+            throw new BusinessRuleException("Service can only begin on a called ticket.");
         }
 
         // Transition State: Called -> Serving

@@ -26,7 +26,7 @@ public class TicketExpiryBackgroundWorker(
         {
             try
             {
-                // Dequeue tasks as they are produced by our HTTP controllers
+                // Dequeue tasks as they are produced by the HTTP controllers
                 var task = await _expiryQueue.DequeueExpiryCheckAsync(stoppingToken);
 
                 // Calculate the delay until the grace period threshold is hit
